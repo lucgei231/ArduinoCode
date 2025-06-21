@@ -28,7 +28,8 @@
                 "C:\\Users\\Student\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\esp-x32\\2411\\xtensa-esp-elf\\include\\c++\\14.2.0\\backward",
                 "C:\\Users\\Student\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\esp-x32\\2411\\lib\\gcc\\xtensa-esp-elf\\14.2.0\\include",
                 "C:\\Users\\Student\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\esp-x32\\2411\\lib\\gcc\\xtensa-esp-elf\\14.2.0\\include-fixed",
-                "C:\\Users\\Student\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\esp-x32\\2411\\xtensa-esp-elf\\include"
+                "C:\\Users\\Student\\AppData\\Local\\Arduino15\\packages\\esp32\\tools\\esp-x32\\2411\\xtensa-esp-elf\\include",
+                "C:\\Users\\Student\\Documents\\Arduino\\libraries"
             ],
             "forcedInclude": [
                 "C:\\Users\\Student\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.2.0\\cores\\esp32\\Arduino.h"

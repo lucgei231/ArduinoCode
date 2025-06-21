@@ -168,6 +168,18 @@ void loop() {
       stopMotors();
       delay(15000);
       Serial.println("Resuming motors.");
+    } else if (cmd.equalsIgnoreCase("spin")) {
+      Serial.println("Received 'spin' command. Spinning for 15 seconds at max speed.");
+      // Spin on the spot: one side forward, one side backward
+      digitalWrite(25, HIGH);   // Left motor forward
+      digitalWrite(26, LOW);
+      analogWrite(33, 255);
+      digitalWrite(12, LOW);    // Right motor backward
+      digitalWrite(14, HIGH);
+      analogWrite(13, 255);
+      delay(15000);
+      stopMotors();
+      Serial.println("Spin complete.");
     }
   }
   // --- End serial command handling ---

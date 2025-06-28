@@ -26,8 +26,8 @@ const int maxDistance = 100;
 const int stopDistance = 5;
 
 // --- New Feature Variables ---
-int lightPin = 27; // Use onboard LED for lights
-bool lightsOn = false;
+int lightPin = 34; // Use onboard LED for lights
+bool lightsOn = true;
 int buzzerPin = 19;
 int lastDistances[10] = {0};
 int distanceIndex = 0;
@@ -36,7 +36,7 @@ bool manualMode = false;
 unsigned long bootMillis = 0; // Feature 3: Uptime tracking
 
 // LED Variables
-#define LED_PIN 16
+#define LED_PIN 34
 #define NUM_LEDS 12
 CRGB leds[NUM_LEDS];
 uint8_t runningPos = 0;

@@ -26,7 +26,7 @@ const int maxDistance = 100;
 const int stopDistance = 5;
 
 // --- New Feature Variables ---
-int lightPin = 34; // Use onboard LED for lights
+int lightPin = 23; // Use onboard LED for lights
 bool lightsOn = true;
 int buzzerPin = 19;
 int lastDistances[10] = {0};
@@ -36,11 +36,42 @@ bool manualMode = false;
 unsigned long bootMillis = 0; // Feature 3: Uptime tracking
 
 // LED Variables
-#define LED_PIN 34
+#define LED_PIN 23
 #define NUM_LEDS 12
 CRGB leds[NUM_LEDS];
 uint8_t runningPos = 0;
 CRGB currentColor = CRGB::Red;
+CRGB backgroundColor = CRGB::Blue; // New: background color
+
+// --- LED SIGNAL HELPERS ---
+void flashLeftSignal() {
+  for (int t = 0; t < 3; t++) {
+    for (int i = 0; i < NUM_LEDS / 2; i++) leds[i] = CRGB::Yellow;
+    for (int i = NUM_LEDS / 2; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
+    FastLED.show();
+    delay(200);
+    for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
+    FastLED.show();
+    delay(200);
+  }
+}
+
+void flashRightSignal() {
+  for (int t = 0; t < 3; t++) {
+    for (int i = 0; i < NUM_LEDS / 2; i++) leds[i] = CRGB::Black;
+    for (int i = NUM_LEDS / 2; i < NUM_LEDS; i++) leds[i] = CRGB::Yellow;
+    FastLED.show();
+    delay(200);
+    for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
+    FastLED.show();
+    delay(200);
+  }
+}
+
+void showStopSignal() {
+  for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Red;
+  FastLED.show();
+}
 
 // Feature 9: Function to clear distance log
 void clearDistanceLog() {
@@ -69,6 +100,7 @@ void stopMotors() {
   digitalWrite(12, LOW);
   digitalWrite(14, LOW);
   analogWrite(13, 0);
+  showStopSignal(); // <-- Add this line
 }
 
 void startMotors(int gospeed) {
@@ -97,6 +129,7 @@ void turnLeft() {
   digitalWrite(12, HIGH);
   digitalWrite(14, LOW);
   analogWrite(13, 200);
+  flashLeftSignal(); // <-- Add this line
   delay(500);
   stopMotors();
 }
@@ -108,6 +141,7 @@ void turnRight() {
   digitalWrite(12, LOW);
   digitalWrite(14, HIGH);
   analogWrite(13, 200);
+  flashRightSignal(); // <-- Add this line
   delay(500);
   stopMotors();
 }
@@ -156,14 +190,24 @@ void testMotors() {
 }
 
 void runningLed() {
-  for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
-  leds[runningPos] = currentColor;
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = backgroundColor; // Use background color for all
+  leds[runningPos] = currentColor; // Running LED is main color
   FastLED.show();
   runningPos = (runningPos + 1) % NUM_LEDS;
 }
 
-void setAllLeds(CRGB color) {
-  for (int i = 0; i < NUM_LEDS; i++) leds[i] = color;
+void setAllLeds(CRGB color, CRGB bgColor) {
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = bgColor;
+  FastLED.show();
+}
+
+// --- Add this function near your other LED functions ---
+void setRainbow() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CHSV((i * 255) / NUM_LEDS, 255, 255);
+  }
   FastLED.show();
 }
 
@@ -289,19 +333,39 @@ void handleDistances() {
 
 void handleLeds() {
   if (server.method() == HTTP_POST) {
-    String color = server.arg("color");
-    long number = strtol(color.c_str()+1, NULL, 16); // skip '#'
-    currentColor = CRGB((number >> 16) & 0xFF, (number >> 8) & 0xFF, number & 0xFF);
-    setAllLeds(currentColor);
+    if (server.hasArg("color")) {
+      String color = server.arg("color");
+      long number = strtol(color.c_str()+1, NULL, 16); // skip '#'
+      currentColor = CRGB((number >> 16) & 0xFF, (number >> 8) & 0xFF, number & 0xFF);
+    }
+    if (server.hasArg("bgcolor")) {
+      String bgcolor = server.arg("bgcolor");
+      long number = strtol(bgcolor.c_str()+1, NULL, 16); // skip '#'
+      backgroundColor = CRGB((number >> 16) & 0xFF, (number >> 8) & 0xFF, number & 0xFF);
+    }
+    if (server.hasArg("rainbow")) {
+      setRainbow();
+      server.sendHeader("Location", "/leds");
+      server.send(303);
+      return;
+    }
+    setAllLeds(currentColor, backgroundColor);
   }
   String html = "<html><body>";
   html += "<h2>LED Control</h2>";
-  html += "<form method='POST'><input type='color' name='color' value='#";
+  html += "<form method='POST'>";
+  html += "Running LED: <input type='color' name='color' value='#";
   char buf[7];
   sprintf(buf, "%02X%02X%02X", currentColor.r, currentColor.g, currentColor.b);
   html += buf;
-  html += "'><button>Set Color</button></form>";
+  html += "'> ";
+  html += "Background: <input type='color' name='bgcolor' value='#";
+  sprintf(buf, "%02X%02X%02X", backgroundColor.r, backgroundColor.g, backgroundColor.b);
+  html += buf;
+  html += "'> ";
+  html += "<button>Set Colors</button></form>";
   html += "<form method='POST' action='/ledrun'><button>Start Running Light</button></form>";
+  html += "<form method='POST'><button name='rainbow' value='1'>Set Rainbow</button></form>";
   html += "<a href='/'>Back</a></body></html>";
   server.send(200, "text/html", html);
 }
@@ -313,7 +377,7 @@ void handleLedRun() {
     delay(100);
     server.handleClient();
   }
-  setAllLeds(currentColor);
+  setAllLeds(currentColor, backgroundColor); // <-- Fix: pass both arguments
   server.sendHeader("Location", "/leds");
   server.send(303);
 }

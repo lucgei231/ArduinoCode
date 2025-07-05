@@ -45,9 +45,10 @@ CRGB backgroundColor = CRGB::Blue; // New: background color
 
 // --- LED SIGNAL HELPERS ---
 void flashLeftSignal() {
+  // Now flashes RIGHT half for left turn
   for (int t = 0; t < 3; t++) {
-    for (int i = 0; i < NUM_LEDS / 2; i++) leds[i] = CRGB::Yellow;
-    for (int i = NUM_LEDS / 2; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
+    for (int i = 0; i < NUM_LEDS / 2; i++) leds[i] = CRGB::Black;
+    for (int i = NUM_LEDS / 2; i < NUM_LEDS; i++) leds[i] = CRGB::Yellow;
     FastLED.show();
     delay(200);
     for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
@@ -57,9 +58,10 @@ void flashLeftSignal() {
 }
 
 void flashRightSignal() {
+  // Now flashes LEFT half for right turn
   for (int t = 0; t < 3; t++) {
-    for (int i = 0; i < NUM_LEDS / 2; i++) leds[i] = CRGB::Black;
-    for (int i = NUM_LEDS / 2; i < NUM_LEDS; i++) leds[i] = CRGB::Yellow;
+    for (int i = 0; i < NUM_LEDS / 2; i++) leds[i] = CRGB::Yellow;
+    for (int i = NUM_LEDS / 2; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
     FastLED.show();
     delay(200);
     for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
@@ -130,7 +132,7 @@ void turnLeft() {
   digitalWrite(14, LOW);
   analogWrite(13, 200);
   flashLeftSignal(); // <-- Add this line
-  delay(500);
+  delay(250);
   stopMotors();
 }
 
@@ -197,6 +199,15 @@ void runningLed() {
   runningPos = (runningPos + 1) % NUM_LEDS;
 }
 
+void runningGreenLed() {
+  static uint8_t pos = 0;
+  for (int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB::Black;
+  leds[pos] = CRGB::Green;
+  FastLED.show();
+  pos = (pos + 1) % NUM_LEDS;
+  delay(80); // Adjust speed as desired
+}
+
 void setAllLeds(CRGB color, CRGB bgColor) {
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = bgColor;
@@ -213,29 +224,65 @@ void setRainbow() {
 
 // --- Web Server Handlers ---
 void handleRoot() {
-  String html = "<html><head><title>ESP32 Robot</title></head><body>";
-  html += "<h1>ESP32 Robot Control</h1>";
-  html += "<p>Distance: " + String(currentDistance) + " cm</p>";
-  html += "<p>Speed: " + String(manualSpeed) + "</p>"; // Feature 4
-  html += "<p>WiFi RSSI: " + String(WiFi.RSSI()) + " dBm</p>"; // Feature 2
-  html += "<p>Uptime: " + String((millis() - bootMillis) / 1000) + " seconds</p>"; // Feature 3
-  html += "<p>AutoStop: " + String(ultrasonicAutoStopping ? "ON" : "OFF") + "</p>"; // Feature 5
-  html += "<p>Mode: " + String(manualMode ? "Manual" : "Auto") + "</p>"; // Feature 7
-  html += "<form method='POST' action='/cmd'><button name='cmd' value='forward'>Forward</button> <button name='cmd' value='back'>Back</button> <button name='cmd' value='left'>Left</button> <button name='cmd' value='right'>Right</button> <button name='cmd' value='stop'>Stop</button> <button name='cmd' value='spin'>Spin</button></form>";
-  html += "<form method='POST' action='/autostop'><button>";
-  html += (ultrasonicAutoStopping ? "Disable AutoStop" : "Enable AutoStop");
-  html += "</button></form>";
-  html += "<form method='POST' action='/testmotors'><button>Test Motors</button></form>";
-  html += "<form method='POST' action='/status'><button>Status</button></form>";
-  html += "<form method='POST' action='/reset'><button>Reset</button></form>";
-  html += "<form method='POST' action='/setspeed'><input name='speed' type='number' min='50' max='255' value='" + String(manualSpeed) + "'><button>Set Speed</button></form>";
-  html += "<form method='POST' action='/togglemode'><button>";
-  html += (manualMode ? "Switch to Auto Mode" : "Switch to Manual Mode"); // Feature 8
-  html += "</button></form>";
-  html += "<form method='POST' action='/cleardistances'><button>Clear Distance Log</button></form>"; // Feature 10
-  html += "<a href='/distances'>Show Last 10 Distances</a> | ";
-  html += "<a href='/leds'>LED Control</a>";
-  html += "</body></html>";
+  String html = R"rawliteral(
+  <html>
+  <head>
+    <title>ESP32 Robot</title>
+    <meta http-equiv="refresh" content="0.5">
+    <style>
+      body { background: #f7f7f7; color: #222; font-family: Arial, sans-serif; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 24px #0002; }
+      h1, h2 { color: #1976d2; }
+      button, input[type="submit"] { background: #1976d2; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; font-size: 1em; margin: 6px 0; cursor: pointer; transition: background 0.2s; }
+      button:hover, input[type="submit"]:hover { background: #1565c0; }
+      input[type="color"], input[type="number"] { margin: 0 8px 0 0; }
+      .row { margin-bottom: 16px; }
+      a { color: #1976d2; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>ESP32 Robot Control</h1>
+      <div class="row">Distance: <b>)rawliteral" + String(currentDistance) + R"rawliteral( cm</b></div>
+      <div class="row">Speed: <b>)rawliteral" + String(manualSpeed) + R"rawliteral(</b></div>
+      <div class="row">WiFi RSSI: <b>)rawliteral" + String(WiFi.RSSI()) + R"rawliteral( dBm</b></div>
+      <div class="row">Uptime: <b>)rawliteral" + String((millis() - bootMillis) / 1000) + R"rawliteral( seconds</b></div>
+      <div class="row">AutoStop: <b>)rawliteral" + String(ultrasonicAutoStopping ? "ON" : "OFF") + R"rawliteral(</b></div>
+      <div class="row">Mode: <b>)rawliteral" + String(manualMode ? "Manual" : "Auto") + R"rawliteral(</b></div>
+      <div class="btn-row">
+        <form method='POST' action='/cmd'><button name='cmd' value='forward'>Forward</button></form>
+        <form method='POST' action='/cmd'><button name='cmd' value='back'>Back</button></form>
+        <form method='POST' action='/cmd'><button name='cmd' value='left'>Left</button></form>
+        <form method='POST' action='/cmd'><button name='cmd' value='right'>Right</button></form>
+        <form method='POST' action='/cmd'><button name='cmd' value='stop'>Stop</button></form>
+        <form method='POST' action='/cmd'><button name='cmd' value='spin'>Spin</button></form>
+      </div>
+      <div class="btn-row">
+        <form method='POST' action='/autostop'><button>)rawliteral" + String(ultrasonicAutoStopping ? "Disable AutoStop" : "Enable AutoStop") + R"rawliteral(</button></form>
+        <form method='POST' action='/testmotors'><button>Test Motors</button></form>
+        <form method='POST' action='/status'><button>Status</button></form>
+        <form method='POST' action='/reset'><button>Reset</button></form>
+      </div>
+      <div class="row">
+        <form method='POST' action='/setspeed'>
+          <label>Set Speed:</label>
+          <input name='speed' type='number' min='50' max='255' value=')" + String(manualSpeed) + R"rawliteral('>
+          <input type='submit' value='Set Speed'>
+        </form>
+      </div>
+      <div class="btn-row">
+        <form method='POST' action='/togglemode'><button>)rawliteral" + String(manualMode ? "Switch to Auto Mode" : "Switch to Manual Mode") + R"rawliteral(</button></form>
+        <form method='POST' action='/cleardistances'><button>Clear Distance Log</button></form>
+      </div>
+      <div class="row">
+        <a href='/distances'>Show Last 10 Distances</a> | <a href='/leds'>LED Control</a>
+      </div>
+    </div>
+  </body>
+  </html>
+  )rawliteral";
   server.send(200, "text/html", html);
 }
 
@@ -322,12 +369,41 @@ void handleClearDistances() {
 }
 
 void handleDistances() {
-  String html = "<html><body><h2>Last 10 Distances (cm)</h2><ul>";
+  String html = R"rawliteral(
+  <html>
+  <head>
+    <title>Last 10 Distances</title>
+    <meta http-equiv="refresh" content="0.5">
+    <style>
+      body { background: #f7f7f7; color: #222; font-family: Arial, sans-serif; margin: 0; padding: 0; }
+      .container { max-width: 400px; margin: 40px auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 24px #0002; }
+      h2 { color: #1976d2; }
+      ul { padding-left: 24px; }
+      li { margin-bottom: 8px; }
+      a { color: #1976d2; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Last 10 Distances (cm)</h2>
+      <ul>
+  )rawliteral";
   for (int i = 0; i < 10; i++) {
     int idx = (distanceIndex + i) % 10;
     html += "<li>" + String(lastDistances[idx]) + "</li>";
   }
-  html += "</ul><a href='/'>Back</a></body></html>";
+  html += R"rawliteral(
+      </ul>
+      <a href='/'>Back</a>
+    </div>
+    <script>
+      // Optional: Use JS for smoother refresh (uncomment to use instead of meta refresh)
+      // setTimeout(() => { location.reload(); }, 500);
+    </script>
+  </body>
+  </html>
+  )rawliteral";
   server.send(200, "text/html", html);
 }
 
@@ -351,22 +427,53 @@ void handleLeds() {
     }
     setAllLeds(currentColor, backgroundColor);
   }
-  String html = "<html><body>";
-  html += "<h2>LED Control</h2>";
-  html += "<form method='POST'>";
-  html += "Running LED: <input type='color' name='color' value='#";
+  String html = R"rawliteral(
+  <html>
+  <head>
+    <title>LED Control</title>
+    <style>
+      body { background: #181c20; color: #f0f0f0; font-family: Arial, sans-serif; margin: 0; padding: 0; }
+      .container { max-width: 500px; margin: 40px auto; background: #23272b; border-radius: 12px; padding: 32px; box-shadow: 0 4px 24px #0008; }
+      h2 { color: #ffb300; }
+      button, input[type="submit"] { background: #ffb300; color: #23272b; border: none; border-radius: 6px; padding: 10px 18px; font-size: 1em; margin: 6px 0; cursor: pointer; transition: background 0.2s; }
+      button:hover, input[type="submit"]:hover { background: #ffa000; }
+      input[type="color"], input[type="number"] { margin: 0 8px 0 0; }
+      .row { margin-bottom: 16px; }
+      a { color: #4fc3f7; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>LED Control</h2>
+      <form method='POST'>
+        <div class="row">
+          <label>Running LED: </label>
+          <input type='color' name='color' value='#)rawliteral";
   char buf[7];
   sprintf(buf, "%02X%02X%02X", currentColor.r, currentColor.g, currentColor.b);
   html += buf;
-  html += "'> ";
-  html += "Background: <input type='color' name='bgcolor' value='#";
+  html += R"rawliteral('>
+          <label>Background: </label>
+          <input type='color' name='bgcolor' value='#)";
   sprintf(buf, "%02X%02X%02X", backgroundColor.r, backgroundColor.g, backgroundColor.b);
   html += buf;
-  html += "'> ";
-  html += "<button>Set Colors</button></form>";
-  html += "<form method='POST' action='/ledrun'><button>Start Running Light</button></form>";
-  html += "<form method='POST'><button name='rainbow' value='1'>Set Rainbow</button></form>";
-  html += "<a href='/'>Back</a></body></html>";
+  html += R"rawliteral('>
+          <input type='submit' value='Set Colors'>
+        </div>
+      </form>
+      <div class="btn-row">
+        <form method='POST' action='/ledrun'><button>Start Running Light</button></form>
+        <form method='POST'><button name='rainbow' value='1'>Set Rainbow</button></form>
+      </div>
+      <div class="row">
+        <a href='/'>Back</a>
+      </div>
+    </div>
+  </body>
+  </html>
+  )rawliteral";
   server.send(200, "text/html", html);
 }
 
@@ -411,21 +518,27 @@ void setup() {
   // Connect to Wi-Fi
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("Connection Failed! Rebooting...");
-    delay(5000);
-    ESP.restart();
-  }
+
   Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
+  unsigned long startAttemptTime = millis();
+  const unsigned long wifiTimeout = 20000; // 20 seconds timeout
+
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < wifiTimeout) {
     Serial.print(".");
-    delay(500);
+    runningGreenLed();
+    delay(100);
   }
   Serial.println();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Connection Failed! Rebooting...");
+    delay(3000);
+    ESP.restart();
+  }
+
   Serial.print("Connected to Wi-Fi: ");
   Serial.println(ssid);
-  Serial.println("Wi-Fi connected!");
-  Serial.print("Web server is running at: http://");
+  Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
   // Setup LED strip
